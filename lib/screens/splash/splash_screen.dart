@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../welcome/welcome_screen.dart';
+import '../../app/auth_gate.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -40,9 +40,12 @@ class _SplashScreenState extends State<SplashScreen>
 
     Timer(const Duration(seconds: 3), () {
       if (!mounted) return;
+
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+        MaterialPageRoute(
+          builder: (_) => const AuthGate(),
+        ),
       );
     });
   }
@@ -62,9 +65,9 @@ class _SplashScreenState extends State<SplashScreen>
           opacity: _fade,
           child: ScaleTransition(
             scale: _scale,
-            child: Column(
+            child: const Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
+              children: [
                 Icon(
                   Icons.two_wheeler,
                   size: 110,
@@ -87,6 +90,7 @@ class _SplashScreenState extends State<SplashScreen>
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 17,
+                    height: 1.5,
                   ),
                 ),
               ],

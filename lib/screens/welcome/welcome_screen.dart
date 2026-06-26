@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../login/login_screen.dart';
+import '../account_type/choose_account_type_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -17,7 +18,6 @@ class WelcomeScreen extends StatelessWidget {
               fit: BoxFit.cover,
             ),
           ),
-
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
@@ -33,7 +33,6 @@ class WelcomeScreen extends StatelessWidget {
               ),
             ),
           ),
-
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(24),
@@ -76,7 +75,14 @@ class WelcomeScreen extends StatelessWidget {
                     width: double.infinity,
                     height: 58,
                     child: OutlinedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ChooseAccountTypeScreen(),
+                          ),
+                        );
+                      },
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white,
                         side: const BorderSide(color: neon, width: 2),

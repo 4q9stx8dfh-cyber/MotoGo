@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "520248161106",
+    "project_id": "motogodev-92ca3",
+    "storage_bucket": "motogodev-92ca3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:520248161106:android:6f208213c16597056b808b",
+        "android_client_info": {
+          "package_name": "com.example.motogo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCELY6obGvhrOydGfH4kaEY_JWFBSk0HuU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

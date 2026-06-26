@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/splash/splash_screen.dart';
+import '../theme/app_theme.dart';
 
 class MotoGoApp extends StatelessWidget {
   const MotoGoApp({super.key});
@@ -9,10 +10,7 @@ class MotoGoApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'MotoGo',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: const Color(0xFF00C853),
-      ),
+      theme: AppTheme.darkTheme,
       home: const SplashScreen(),
     );
   }
