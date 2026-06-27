@@ -1,18 +1,62 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import '../../map/searching_driver_screen.dart';
+import 'package:latlong2/latlong.dart';
 
-import '../../map/map_screen.dart';
-import '../../models/user_model.dart';
+import '../../map/map_controller.dart';
+import '../../map/search_screen.dart';
+import '../../map/nominatim_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
+import '../../models/user_model.dart';
 import '../welcome/welcome_screen.dart';
 
-class PassengerHomeScreen extends StatelessWidget {
+class PassengerHomeScreen extends StatefulWidget {
   const PassengerHomeScreen({super.key});
 
+  @override
+  State<PassengerHomeScreen> createState() => _PassengerHomeScreenState();
+}
+
+class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
   static const Color green = Color(0xFF00C853);
   static const Color dark = Color(0xFF121212);
   static const Color card = Color(0xFF1E1E1E);
+
+  final MapController _mapController = MapController();
+  final MapControllerMotoGo _controller = MapControllerMotoGo();
+
+  PlaceResult? _destination;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.loadLocation();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openSearch() async {
+    final result = await Navigator.push<PlaceResult>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const SearchScreen(),
+      ),
+    );
+
+    if (result == null) return;
+
+    setState(() {
+      _destination = result;
+    });
+
+    _mapController.move(result.location, 16);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,8 +68,8 @@ class PassengerHomeScreen extends StatelessWidget {
 
     return FutureBuilder<UserModel?>(
       future: FirestoreService().getUser(uid),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+      builder: (context, userSnapshot) {
+        if (userSnapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             backgroundColor: dark,
             body: Center(
@@ -34,218 +78,232 @@ class PassengerHomeScreen extends StatelessWidget {
           );
         }
 
-        final user = snapshot.data;
+        final user = userSnapshot.data;
 
         if (user == null) {
           return const WelcomeScreen();
         }
 
-        return Scaffold(
-          backgroundColor: dark,
-          appBar: AppBar(
-            backgroundColor: dark,
-            elevation: 0,
-            title: const Text(
-              'MotoGo',
-              style: TextStyle(
-                color: green,
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.logout, color: Colors.white70),
-                onPressed: () async {
-                  await AuthService().logout();
+        return AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final current = _controller.currentLocation;
 
-                  if (context.mounted) {
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const WelcomeScreen(),
-                      ),
-                          (route) => false,
-                    );
-                  }
-                },
-              ),
-            ],
-          ),
-          body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            if (current == null) {
+              return const Scaffold(
+                backgroundColor: dark,
+                body: Center(
+                  child: CircularProgressIndicator(color: green),
+                ),
+              );
+            }
+
+            return Scaffold(
+              body: Stack(
                 children: [
-                  Text(
-                    '👋 Hola, ${user.name}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
+                  FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      initialCenter: current,
+                      initialZoom: 15.5,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '¿A dónde vamos hoy?',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 18,
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: card,
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.my_location, color: green),
-                        SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            'Usar mi ubicación actual',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 17,
-                            ),
-                          ),
-                        ),
-                        Icon(
-                          Icons.arrow_forward_ios,
-                          color: Colors.white38,
-                          size: 18,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: card,
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: green.withOpacity(0.5)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.search, color: green),
-                        SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            '¿A dónde quieres ir?',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 17,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  const Text(
-                    'Accesos rápidos',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Row(
                     children: [
-                      Expanded(
-                        child: _QuickAccessCard(
-                          icon: Icons.home_outlined,
-                          title: 'Casa',
-                        ),
+                      TileLayer(
+                        urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.example.motogo',
                       ),
-                      SizedBox(width: 14),
-                      Expanded(
-                        child: _QuickAccessCard(
-                          icon: Icons.work_outline,
-                          title: 'Trabajo',
-                        ),
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: current,
+                            width: 60,
+                            height: 60,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: green.withOpacity(0.25),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.my_location,
+                                  color: green,
+                                  size: 34,
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (_destination != null)
+                            Marker(
+                              point: _destination!.location,
+                              width: 60,
+                              height: 60,
+                              child: const Icon(
+                                Icons.location_on,
+                                color: Colors.redAccent,
+                                size: 46,
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),
-                  const Spacer(),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 58,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const MotoGoMapScreen(),
+
+                  SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              decoration: BoxDecoration(
+                                color: dark.withOpacity(0.92),
+                                borderRadius: BorderRadius.circular(22),
+                              ),
+                              child: Text(
+                                '👋 Hola, ${user.name}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                           ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: green,
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
+                          const SizedBox(width: 10),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: dark.withOpacity(0.92),
+                              shape: BoxShape.circle,
+                            ),
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.logout,
+                                color: Colors.white70,
+                              ),
+                              onPressed: () async {
+                                await AuthService().logout();
+
+                                if (context.mounted) {
+                                  Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const WelcomeScreen(),
+                                    ),
+                                        (route) => false,
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                        ],
                       ),
-                      child: const Text(
-                        'Solicitar Moto',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    ),
+                  ),
+
+                  Positioned(
+                    left: 18,
+                    right: 18,
+                    bottom: 24,
+                    child: Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: dark.withOpacity(0.95),
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.35),
+                            blurRadius: 18,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: _openSearch,
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: card,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: green.withOpacity(0.35),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.search, color: green),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      _destination == null
+                                          ? '¿A dónde quieres ir?'
+                                          : _destination!.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: _destination == null
+                                            ? Colors.white70
+                                            : Colors.white,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 54,
+                            child: ElevatedButton(
+                              onPressed: _destination == null
+                                  ? null
+                                  : () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const SearchingDriverScreen(),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: green,
+                                foregroundColor: Colors.black,
+                                disabledBackgroundColor: Colors.white24,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(28),
+                                ),
+                              ),
+                              child: const Text(
+                                'Solicitar Moto',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
-          ),
+            );
+          },
         );
       },
-    );
-  }
-}
-
-class _QuickAccessCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-
-  const _QuickAccessCard({
-    required this.icon,
-    required this.title,
-  });
-
-  static const Color green = Color(0xFF00C853);
-  static const Color card = Color(0xFF1E1E1E);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 95,
-      decoration: BoxDecoration(
-        color: card,
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: green, size: 30),
-          const SizedBox(height: 10),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

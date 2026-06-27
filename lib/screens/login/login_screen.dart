@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+
+import '../../app/auth_gate.dart';
 import '../../services/auth_service.dart';
 import '../forgot_password/forgot_password_screen.dart';
-import '../home/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -37,7 +38,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(
+          builder: (_) => const AuthGate(),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -76,7 +79,10 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                  icon: const Icon(
+                    Icons.arrow_back_ios_new,
+                    color: Colors.white,
+                  ),
                 ),
 
                 const SizedBox(height: 20),
