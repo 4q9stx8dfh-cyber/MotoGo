@@ -1,16 +1,18 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import '../../map/searching_driver_screen.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../map/map_controller.dart';
-import '../../map/search_screen.dart';
 import '../../map/nominatim_service.dart';
+import '../../map/search_screen.dart';
+import '../../map/searching_driver_screen.dart';
+import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
-import '../../models/user_model.dart';
 import '../welcome/welcome_screen.dart';
+import '../../services/fare_service.dart';
+import '../../widgets/fare_offer_widget.dart';
 
 class PassengerHomeScreen extends StatefulWidget {
   const PassengerHomeScreen({super.key});
@@ -26,13 +28,25 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
 
   final MapController _mapController = MapController();
   final MapControllerMotoGo _controller = MapControllerMotoGo();
+  Future<UserModel?>? _userFuture;
 
   PlaceResult? _destination;
+  double? _distanceKm;
+  double? _estimatedFare;
+  double? _minimumOffer;
+  double? _currentOffer;
 
   @override
   void initState() {
     super.initState();
+
     _controller.loadLocation();
+
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
+    if (uid != null) {
+      _userFuture = FirestoreService().getUser(uid);
+    }
   }
 
   @override
@@ -51,9 +65,25 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
 
     if (result == null) return;
 
-    setState(() {
-      _destination = result;
-    });
+    final current = _controller.currentLocation;
+
+    if (current != null) {
+      final distance = const Distance();
+      final meters = distance(current, result.location);
+      final km = meters / 1000;
+
+      setState(() {
+        _destination = result;
+        _distanceKm = km;
+        _minimumOffer = km < 1 ? 1.0 : km;
+        _currentOffer = _minimumOffer!;
+        _estimatedFare = _currentOffer;
+      });
+    } else {
+      setState(() {
+        _destination = result;
+      });
+    }
 
     _mapController.move(result.location, 16);
   }
@@ -67,7 +97,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
     }
 
     return FutureBuilder<UserModel?>(
-      future: FirestoreService().getUser(uid),
+      future: _userFuture,
       builder: (context, userSnapshot) {
         if (userSnapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -262,7 +292,24 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
                               ),
                             ),
                           ),
+
+                          if (_destination != null &&
+                              _distanceKm != null &&
+                              _minimumOffer != null &&
+                              _currentOffer != null)
+                            FareOfferWidget(
+                              minimumOffer: _minimumOffer!,
+                              currentOffer: _currentOffer!,
+                              onOfferChanged: (value) {
+                                setState(() {
+                                  _currentOffer = value;
+                                  _estimatedFare = value;
+                                });
+                              },
+                            ),
+
                           const SizedBox(height: 14),
+
                           SizedBox(
                             width: double.infinity,
                             height: 54,
@@ -273,7 +320,8 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => const SearchingDriverScreen(),
+                                    builder: (_) =>
+                                    const SearchingDriverScreen(),
                                   ),
                                 );
                               },
