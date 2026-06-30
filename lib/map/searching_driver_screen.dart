@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
 class SearchingDriverScreen extends StatelessWidget {
-  const SearchingDriverScreen({super.key});
+  final double offer;
+
+  const SearchingDriverScreen({
+    super.key,
+    required this.offer,
+  });
 
   static const Color green = Color(0xFF00C853);
   static const Color dark = Color(0xFF121212);
@@ -32,6 +37,16 @@ class SearchingDriverScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
+              Text(
+                'Oferta enviada: S/ ${offer.toStringAsFixed(2)}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: green,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 14),
               const Text(
                 'Estamos buscando una moto cercana para ti.',
                 textAlign: TextAlign.center,

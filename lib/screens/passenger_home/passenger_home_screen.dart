@@ -15,6 +15,7 @@ import '../../services/fare_service.dart';
 import '../../widgets/fare_offer_widget.dart';
 import '../../models/driver_model.dart';
 import '../../services/driver_service.dart';
+import '../../widgets/driver_accept_card.dart';
 
 class PassengerHomeScreen extends StatefulWidget {
   const PassengerHomeScreen({super.key});
@@ -38,6 +39,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
   double? _minimumOffer;
   double? _currentOffer;
   List<DriverModel> _drivers = [];
+  DriverModel? _assignedDriver;
 
   @override
   void initState() {
@@ -351,7 +353,9 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) =>
-                                    const SearchingDriverScreen(),
+                                        SearchingDriverScreen(
+                                          offer: _currentOffer ?? 0,
+                                        ),
                                   ),
                                 );
                               },
