@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../controllers/trip_controller.dart';
 import '../../map/map_controller.dart';
 import '../../map/nominatim_service.dart';
 import '../../map/search_screen.dart';
@@ -11,11 +12,8 @@ import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../welcome/welcome_screen.dart';
-import '../../services/fare_service.dart';
-import '../../widgets/fare_offer_widget.dart';
-import '../../models/driver_model.dart';
-import '../../widgets/driver_accept_card.dart';
-import '../../controllers/trip_controller.dart';
+import 'widgets/passenger_bottom_panel.dart';
+import 'widgets/passenger_header.dart';
 
 class PassengerHomeScreen extends StatefulWidget {
   const PassengerHomeScreen({super.key});
@@ -27,25 +25,25 @@ class PassengerHomeScreen extends StatefulWidget {
 class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
   static const Color green = Color(0xFF00C853);
   static const Color dark = Color(0xFF121212);
-  static const Color card = Color(0xFF1E1E1E);
 
   final MapController _mapController = MapController();
-  final MapControllerMotoGo _controller = MapControllerMotoGo();
+  final MapControllerMotoGo _locationController = MapControllerMotoGo();
+  final TripController _tripController = TripController();
+
   Future<UserModel?>? _userFuture;
 
   PlaceResult? _destination;
   double? _distanceKm;
-  double? _estimatedFare;
   double? _minimumOffer;
   double? _currentOffer;
-  final TripController _tripController = TripController();
-  DriverModel? _assignedDriver;
 
   @override
   void initState() {
     super.initState();
 
-    _controller.loadLocation();
+    _locationController.loadLocation();
+
+    _tripController.addListener(_followDriver);
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
@@ -56,10 +54,20 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
 
   @override
   void dispose() {
-    _controller.dispose();
+    _tripController.removeListener(_followDriver);
+
+    _locationController.dispose();
+    _tripController.dispose();
+
     super.dispose();
   }
+  void _followDriver() {
+    final movingDriver = _tripController.movingDriverPosition;
 
+    if (movingDriver != null) {
+      _mapController.move(movingDriver, 16.5);
+    }
+  }
   Future<void> _openSearch() async {
     final result = await Navigator.push<PlaceResult>(
       context,
@@ -70,7 +78,14 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
 
     if (result == null) return;
 
-    final current = _controller.currentLocation;
+    final current = _locationController.currentLocation;
+    final movingDriver = _tripController.movingDriverPosition;
+
+    if (movingDriver != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _mapController.move(movingDriver, 16.5);
+      });
+    }
 
     if (current != null) {
       final distance = const Distance();
@@ -82,8 +97,9 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
         _distanceKm = km;
         _minimumOffer = km < 1 ? 1.0 : km;
         _currentOffer = _minimumOffer!;
-        _estimatedFare = _currentOffer;
       });
+
+      _tripController.generateDrivers(current);
     } else {
       setState(() {
         _destination = result;
@@ -91,12 +107,67 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
     }
 
     _mapController.move(result.location, 16);
-    if (current != null) {
-      _generateDrivers(current);
+  }
+
+  Future<void> _requestTrip() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final origin = _locationController.currentLocation;
+
+    if (uid == null || origin == null || _destination == null) return;
+
+    _tripController.createTrip(
+      passengerId: uid,
+      origin: origin,
+      destination: _destination!.location,
+      offer: _currentOffer ?? 0,
+    );
+
+    final searchScreen = Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SearchingDriverScreen(
+          offer: _currentOffer ?? 0,
+        ),
+      ),
+    );
+
+    await _tripController.assignNearestDriver();
+
+    final accepted = await searchScreen;
+
+    if (accepted == true && mounted) {
+      final passengerLocation = _locationController.currentLocation;
+
+      if (passengerLocation != null) {
+        _tripController.moveAssignedDriverToPassenger(passengerLocation);
+
+        Future.delayed(const Duration(milliseconds: 500), () {
+          final movingPosition = _tripController.movingDriverPosition;
+
+          if (movingPosition != null) {
+            _mapController.move(movingPosition, 16.5);
+          }
+        });
+      }
     }
   }
-  void _generateDrivers(LatLng center) {
-    _tripController.generateDrivers(center);
+
+  Future<void> _logout() async {
+    await AuthService().logout();
+
+    if (!mounted) return;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const WelcomeScreen(),
+      ),
+          (route) => false,
+    );
+  }
+
+  void _cancelTrip() {
+    _tripController.cancelTrip();
   }
 
   @override
@@ -126,9 +197,12 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
         }
 
         return AnimatedBuilder(
-          animation: _controller,
+          animation: Listenable.merge([
+            _locationController,
+            _tripController,
+          ]),
           builder: (context, _) {
-            final current = _controller.currentLocation;
+            final current = _locationController.currentLocation;
 
             if (current == null) {
               return const Scaffold(
@@ -186,197 +260,67 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
                               ),
                             ),
                           ..._tripController.drivers.map(
-                                (driver) => Marker(
-                              point: driver.position,
-                              width: 46,
-                              height: 46,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF121212),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: green, width: 2),
+                                (driver) {
+                              final isAssigned =
+                                  _tripController.assignedDriver?.id ==
+                                      driver.id;
+
+                              final point = isAssigned &&
+                                  _tripController.movingDriverPosition !=
+                                      null
+                                  ? _tripController.movingDriverPosition!
+                                  : driver.position;
+
+                              return Marker(
+                                point: point,
+                                width: 46,
+                                height: 46,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF121212),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: isAssigned
+                                          ? Colors.orangeAccent
+                                          : green,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.two_wheeler,
+                                    color: isAssigned
+                                        ? Colors.orangeAccent
+                                        : green,
+                                    size: 28,
+                                  ),
                                 ),
-                                child: const Icon(
-                                  Icons.two_wheeler,
-                                  color: green,
-                                  size: 28,
-                                ),
-                              ),
-                            ),
+                              );
+                            },
                           ),
                         ],
                       ),
                     ],
                   ),
 
-                  SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
-                              ),
-                              decoration: BoxDecoration(
-                                color: dark.withOpacity(0.92),
-                                borderRadius: BorderRadius.circular(22),
-                              ),
-                              child: Text(
-                                '👋 Hola, ${user.name}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: dark.withOpacity(0.92),
-                              shape: BoxShape.circle,
-                            ),
-                            child: IconButton(
-                              icon: const Icon(
-                                Icons.logout,
-                                color: Colors.white70,
-                              ),
-                              onPressed: () async {
-                                await AuthService().logout();
-
-                                if (context.mounted) {
-                                  Navigator.pushAndRemoveUntil(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => const WelcomeScreen(),
-                                    ),
-                                        (route) => false,
-                                  );
-                                }
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  PassengerHeader(
+                    userName: user.name,
+                    onLogout: _logout,
                   ),
 
-                  Positioned(
-                    left: 18,
-                    right: 18,
-                    bottom: 24,
-                    child: Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: dark.withOpacity(0.95),
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.35),
-                            blurRadius: 18,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          InkWell(
-                            borderRadius: BorderRadius.circular(20),
-                            onTap: _openSearch,
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: card,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: green.withOpacity(0.35),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.search, color: green),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      _destination == null
-                                          ? '¿A dónde quieres ir?'
-                                          : _destination!.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: _destination == null
-                                            ? Colors.white70
-                                            : Colors.white,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          if (_destination != null &&
-                              _distanceKm != null &&
-                              _minimumOffer != null &&
-                              _currentOffer != null)
-                            FareOfferWidget(
-                              minimumOffer: _minimumOffer!,
-                              currentOffer: _currentOffer!,
-                              onOfferChanged: (value) {
-                                setState(() {
-                                  _currentOffer = value;
-                                  _estimatedFare = value;
-                                });
-                              },
-                            ),
-
-                          const SizedBox(height: 14),
-
-                          SizedBox(
-                            width: double.infinity,
-                            height: 54,
-                            child: ElevatedButton(
-                              onPressed: _destination == null
-                                  ? null
-                                  : () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        SearchingDriverScreen(
-                                          offer: _currentOffer ?? 0,
-                                        ),
-                                  ),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: green,
-                                foregroundColor: Colors.black,
-                                disabledBackgroundColor: Colors.white24,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(28),
-                                ),
-                              ),
-                              child: const Text(
-                                'Solicitar Moto',
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  PassengerBottomPanel(
+                    destination: _destination,
+                    distanceKm: _distanceKm,
+                    minimumOffer: _minimumOffer,
+                    currentOffer: _currentOffer,
+                    assignedDriver: _tripController.assignedDriver,
+                    onSearchTap: _openSearch,
+                    onRequestTrip: _requestTrip,
+                    onCancelTrip: _cancelTrip,
+                    onOfferChanged: (value) {
+                      setState(() {
+                        _currentOffer = value;
+                      });
+                    },
                   ),
                 ],
               ),

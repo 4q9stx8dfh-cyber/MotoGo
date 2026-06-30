@@ -1,6 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
-class SearchingDriverScreen extends StatelessWidget {
+class SearchingDriverScreen extends StatefulWidget {
   final double offer;
 
   const SearchingDriverScreen({
@@ -8,8 +9,23 @@ class SearchingDriverScreen extends StatelessWidget {
     required this.offer,
   });
 
+  @override
+  State<SearchingDriverScreen> createState() => _SearchingDriverScreenState();
+}
+
+class _SearchingDriverScreenState extends State<SearchingDriverScreen> {
   static const Color green = Color(0xFF00C853);
   static const Color dark = Color(0xFF121212);
+
+  @override
+  void initState() {
+    super.initState();
+
+    Timer(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,11 +37,7 @@ class SearchingDriverScreen extends StatelessWidget {
           child: Column(
             children: [
               const Spacer(),
-              const Icon(
-                Icons.two_wheeler,
-                color: green,
-                size: 90,
-              ),
+              const Icon(Icons.two_wheeler, color: green, size: 90),
               const SizedBox(height: 24),
               const Text(
                 'Buscando conductor...',
@@ -38,21 +50,11 @@ class SearchingDriverScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Oferta enviada: S/ ${offer.toStringAsFixed(2)}',
-                textAlign: TextAlign.center,
+                'Oferta enviada: S/ ${widget.offer.toStringAsFixed(2)}',
                 style: const TextStyle(
                   color: green,
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'Estamos buscando una moto cercana para ti.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 17,
                 ),
               ),
               const SizedBox(height: 35),
@@ -62,7 +64,7 @@ class SearchingDriverScreen extends StatelessWidget {
                 width: double.infinity,
                 height: 56,
                 child: OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(context, false),
                   child: const Text('Cancelar búsqueda'),
                 ),
               ),
