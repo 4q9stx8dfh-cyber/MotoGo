@@ -2,22 +2,14 @@ import 'dart:async';
 import 'package:latlong2/latlong.dart';
 
 class DriverNavigationService {
-  Stream<LatLng> simulateDriverMovement({
-    required LatLng start,
-    required LatLng end,
+  Stream<LatLng> simulateDriverMovementByRoute({
+    required List<LatLng> routePoints,
   }) async* {
-    const steps = 80;
+    if (routePoints.isEmpty) return;
 
-    for (int i = 0; i <= steps; i++) {
-      final lat =
-          start.latitude + (end.latitude - start.latitude) * i / steps;
-
-      final lng =
-          start.longitude + (end.longitude - start.longitude) * i / steps;
-
-      await Future.delayed(const Duration(milliseconds: 250));
-
-      yield LatLng(lat, lng);
+    for (final point in routePoints) {
+      await Future.delayed(const Duration(milliseconds: 180));
+      yield point;
     }
   }
 }

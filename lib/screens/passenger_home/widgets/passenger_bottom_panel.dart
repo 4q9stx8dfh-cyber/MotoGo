@@ -4,6 +4,7 @@ import '../../../map/nominatim_service.dart';
 import '../../../widgets/fare_offer_widget.dart';
 import '../../../widgets/driver_accept_card.dart';
 import '../../../models/driver_model.dart';
+import '../../../models/trip_state.dart';
 
 class PassengerBottomPanel extends StatelessWidget {
   final PlaceResult? destination;
@@ -15,6 +16,7 @@ class PassengerBottomPanel extends StatelessWidget {
   final VoidCallback onRequestTrip;
   final VoidCallback onCancelTrip;
   final ValueChanged<double> onOfferChanged;
+  final TripState tripState;
 
   const PassengerBottomPanel({
     super.key,
@@ -27,6 +29,7 @@ class PassengerBottomPanel extends StatelessWidget {
     required this.onRequestTrip,
     required this.onCancelTrip,
     required this.onOfferChanged,
+    required this.tripState,
   });
 
   static const Color green = Color(0xFF00C853);
@@ -36,6 +39,7 @@ class PassengerBottomPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasDriver = assignedDriver != null;
+    final driverArrived = tripState == TripState.driverArrived;
 
     return Positioned(
       left: 18,
@@ -99,6 +103,26 @@ class PassengerBottomPanel extends StatelessWidget {
                 driver: assignedDriver!,
                 onCancel: onCancelTrip,
               ),
+              if (driverArrived)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: green.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: green),
+                  ),
+                  child: const Text(
+                    'Tu conductor ha llegado',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: green,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
             ] else ...[
               if (destination != null &&
                   distanceKm != null &&

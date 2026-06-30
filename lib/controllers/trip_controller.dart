@@ -73,22 +73,44 @@ class TripController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void moveAssignedDriverToPassenger(LatLng passengerLocation) {
-    if (assignedDriver == null) return;
+  void moveAssignedDriverByRoute(
+      List<LatLng> routePoints, {
+        TripState completedState = TripState.driverArrived,
+      }) {
+    if (assignedDriver == null || routePoints.isEmpty) return;
 
     _driverMovementSubscription?.cancel();
 
+    state = completedState == TripState.driverArrived
+        ? TripState.driverArriving
+        : TripState.inTrip;
+
+    notifyListeners();
+
     _driverMovementSubscription = _navigationService
-        .simulateDriverMovement(
-      start: assignedDriver!.position,
-      end: passengerLocation,
-    )
-        .listen((position) {
-      movingDriverPosition = position;
-      assignedDriver!.position = position;
-      state = TripState.driverArriving;
-      notifyListeners();
-    });
+        .simulateDriverMovementByRoute(routePoints: routePoints)
+        .listen(
+          (position) {
+        movingDriverPosition = position;
+        assignedDriver!.position = position;
+        notifyListeners();
+      },
+      onDone: () {
+        state = completedState;
+        notifyListeners();
+      },
+    );
+  }
+
+  void startTrip() {
+    state = TripState.inTrip;
+    notifyListeners();
+  }
+
+  void completeTrip() {
+    _driverMovementSubscription?.cancel();
+    state = TripState.completed;
+    notifyListeners();
   }
 
   void cancelTrip() {

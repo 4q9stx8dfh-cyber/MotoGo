@@ -3,6 +3,7 @@ enum TripState {
   searching,
   driverAssigned,
   driverArriving,
+  driverArrived,
   inTrip,
   completed,
   cancelled,

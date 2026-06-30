@@ -14,6 +14,8 @@ import '../../services/firestore_service.dart';
 import '../welcome/welcome_screen.dart';
 import 'widgets/passenger_bottom_panel.dart';
 import 'widgets/passenger_header.dart';
+import '../../services/route_service.dart';
+import '../../models/trip_state.dart';
 
 class PassengerHomeScreen extends StatefulWidget {
   const PassengerHomeScreen({super.key});
@@ -36,6 +38,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
   double? _distanceKm;
   double? _minimumOffer;
   double? _currentOffer;
+  List<LatLng> _routePoints = [];
 
   @override
   void initState() {
@@ -91,12 +94,17 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
       final distance = const Distance();
       final meters = distance(current, result.location);
       final km = meters / 1000;
+      final route = await RouteService().getRoute(
+        start: current,
+        end: result.location,
+      );
 
       setState(() {
         _destination = result;
         _distanceKm = km;
         _minimumOffer = km < 1 ? 1.0 : km;
         _currentOffer = _minimumOffer!;
+        _routePoints = route;
       });
 
       _tripController.generateDrivers(current);
@@ -139,7 +147,19 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
       final passengerLocation = _locationController.currentLocation;
 
       if (passengerLocation != null) {
-        _tripController.moveAssignedDriverToPassenger(passengerLocation);
+        final driver = _tripController.assignedDriver;
+
+        if (driver != null) {
+          final driverRoute = await RouteService().getRoute(
+            start: driver.position,
+            end: passengerLocation,
+          );
+
+          _tripController.moveAssignedDriverByRoute(
+            driverRoute,
+            completedState: TripState.driverArrived,
+          );
+        }
 
         Future.delayed(const Duration(milliseconds: 500), () {
           final movingPosition = _tripController.movingDriverPosition;
@@ -228,6 +248,16 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
                         'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                         userAgentPackageName: 'com.example.motogo',
                       ),
+                      if (_routePoints.isNotEmpty)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: _routePoints,
+                              color: green,
+                              strokeWidth: 5,
+                            ),
+                          ],
+                        ),
                       MarkerLayer(
                         markers: [
                           Marker(
@@ -308,6 +338,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
                   ),
 
                   PassengerBottomPanel(
+                    tripState: _tripController.state,
                     destination: _destination,
                     distanceKm: _distanceKm,
                     minimumOffer: _minimumOffer,
