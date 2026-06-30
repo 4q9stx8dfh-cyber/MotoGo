@@ -14,8 +14,8 @@ import '../welcome/welcome_screen.dart';
 import '../../services/fare_service.dart';
 import '../../widgets/fare_offer_widget.dart';
 import '../../models/driver_model.dart';
-import '../../services/driver_service.dart';
 import '../../widgets/driver_accept_card.dart';
+import '../../controllers/trip_controller.dart';
 
 class PassengerHomeScreen extends StatefulWidget {
   const PassengerHomeScreen({super.key});
@@ -38,7 +38,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
   double? _estimatedFare;
   double? _minimumOffer;
   double? _currentOffer;
-  List<DriverModel> _drivers = [];
+  final TripController _tripController = TripController();
   DriverModel? _assignedDriver;
 
   @override
@@ -96,9 +96,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
     }
   }
   void _generateDrivers(LatLng center) {
-    setState(() {
-      _drivers = DriverService().generateDrivers(center);
-    });
+    _tripController.generateDrivers(center);
   }
 
   @override
@@ -187,7 +185,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
                                 size: 46,
                               ),
                             ),
-                          ..._drivers.map(
+                          ..._tripController.drivers.map(
                                 (driver) => Marker(
                               point: driver.position,
                               width: 46,
