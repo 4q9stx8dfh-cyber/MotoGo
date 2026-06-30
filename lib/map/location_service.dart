@@ -3,8 +3,8 @@ import 'package:geolocator/geolocator.dart';
 class LocationService {
   Future<Position> getCurrentLocation() async {
     return Position(
-      latitude: -12.0464,
-      longitude: -77.0428,
+      latitude: -7.1617,
+      longitude: -78.5128,
       timestamp: DateTime.now(),
       accuracy: 1,
       altitude: 0,

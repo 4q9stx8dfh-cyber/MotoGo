@@ -13,6 +13,8 @@ import '../../services/firestore_service.dart';
 import '../welcome/welcome_screen.dart';
 import '../../services/fare_service.dart';
 import '../../widgets/fare_offer_widget.dart';
+import '../../models/driver_model.dart';
+import '../../services/driver_service.dart';
 
 class PassengerHomeScreen extends StatefulWidget {
   const PassengerHomeScreen({super.key});
@@ -35,6 +37,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
   double? _estimatedFare;
   double? _minimumOffer;
   double? _currentOffer;
+  List<DriverModel> _drivers = [];
 
   @override
   void initState() {
@@ -86,6 +89,14 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
     }
 
     _mapController.move(result.location, 16);
+    if (current != null) {
+      _generateDrivers(current);
+    }
+  }
+  void _generateDrivers(LatLng center) {
+    setState(() {
+      _drivers = DriverService().generateDrivers(center);
+    });
   }
 
   @override
@@ -174,6 +185,25 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
                                 size: 46,
                               ),
                             ),
+                          ..._drivers.map(
+                                (driver) => Marker(
+                              point: driver.position,
+                              width: 46,
+                              height: 46,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF121212),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: green, width: 2),
+                                ),
+                                child: const Icon(
+                                  Icons.two_wheeler,
+                                  color: green,
+                                  size: 28,
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ],
